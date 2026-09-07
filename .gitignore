@@ -1,0 +1,4 @@
+﻿app/data/chroma/
+app/scraper/data/
+*.sqlite3
+*.jsonl

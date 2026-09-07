@@ -1,0 +1,30 @@
+# ============================================================
+# Scraping (app/scraper/)
+# ============================================================
+requests
+beautifulsoup4
+lxml
+
+# ============================================================
+# Data structuring, embedding & indexing (app/application, app/infrastructure)
+# ============================================================
+chromadb
+sentence-transformers
+
+# ============================================================
+# Agent (app/agent/) - LangGraph + LLM via OpenRouter
+# ============================================================
+langgraph
+langchain-core
+langchain-openai
+
+# ============================================================
+# Backend API / streaming (app/chat/, app/main.py)
+# ============================================================
+fastapi
+uvicorn[standard]
+
+# ============================================================
+# Dev/testing only (not required to run the app itself)
+# ============================================================
+# httpx          # needed only for FastAPI's TestClient in automated tests
