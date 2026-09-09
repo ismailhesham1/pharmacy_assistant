@@ -1,35 +1,51 @@
-import logging #structured Logs 
+import json
+import logging #structured Logs
 import uuid
 
 from fastapi import WebSocket, WebSocketDisconnect
 from langchain_core.messages import HumanMessage
 
-from agent.graph import build_graph
 from agent.injection_guard import check_for_injection
-from chat.events import translate_event
+from chat.events import serialize_history, translate_event
 
 logger = logging.getLogger("chat")
-
-_agent_app = None
-
-
-def _get_agent_app():
-    global _agent_app
-    if _agent_app is None:
-        _agent_app = build_graph()
-    return _agent_app
 
 
 async def handle_connection(websocket: WebSocket) -> None:
     await websocket.accept()
-    thread_id = str(uuid.uuid4())
+    # A thread_id supplied by the client (persisted client-side across
+    # reconnects/refreshes) resumes that same conversation via the
+    # checkpointer; otherwise start a new one and hand its id back to the
+    # client so it can remember it for next time.
+    thread_id = websocket.query_params.get("thread_id") or str(uuid.uuid4())
     config = {"configurable": {"thread_id": thread_id}}
-    agent_app = _get_agent_app()
+    agent_app = websocket.app.state.agent_app
 
     try:
+        state = await agent_app.aget_state(config)
+        past_messages = state.values.get("messages", []) if state else []
+        await websocket.send_json({
+            "type": "history",
+            "thread_id": thread_id,
+            "messages": serialize_history(past_messages),
+        })
+
         while True:
-            data = await websocket.receive_json()
-            user_text = data.get("content", "").strip()
+            try:
+                data = await websocket.receive_json()
+            except json.JSONDecodeError:
+                # Not a WebSocketDisconnect - the socket is still open, the
+                # client just sent a frame that isn't valid JSON. Ignore it
+                # and keep the connection alive instead of crashing.
+                logger.warning("Received malformed (non-JSON) message on thread %s; ignoring.", thread_id)
+                continue
+
+            user_text = data.get("content")
+            if not isinstance(user_text, str):
+                # "content" missing, null, or some other non-string type -
+                # nothing sensible to send to the agent, skip this frame.
+                continue
+            user_text = user_text.strip()
             if not user_text:
                 continue
 

@@ -98,7 +98,14 @@ def should_continue(state: AgentState) -> str:
     return "disclaimer"
 
 
-def build_graph():
+def build_graph(checkpointer=None):
+    """
+    checkpointer: optional LangGraph checkpointer to persist conversation
+    state (e.g. AsyncSqliteSaver, wired up in main.py for the real app so
+    chat history survives reconnects/refreshes). Defaults to an in-memory
+    MemorySaver when not given, which keeps callers like scripts/chat_test.py
+    working exactly as before.
+    """
     graph = StateGraph(AgentState)
     graph.add_node("detect_language", detect_language_node)
     graph.add_node("agent", agent_node)
@@ -111,5 +118,6 @@ def build_graph():
     graph.add_edge("tools", "agent")
     graph.add_edge("disclaimer", END)
 
-    checkpointer = MemorySaver()
+    if checkpointer is None:
+        checkpointer = MemorySaver()
     return graph.compile(checkpointer=checkpointer)

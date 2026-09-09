@@ -15,6 +15,7 @@ sentence-transformers
 # Agent (app/agent/) - LangGraph + LLM via OpenRouter
 # ============================================================
 langgraph
+langgraph-checkpoint-sqlite  # persists chat history (app/data/chat_history.sqlite3)
 langchain-core
 langchain-openai
 

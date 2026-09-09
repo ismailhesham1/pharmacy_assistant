@@ -1,6 +1,26 @@
+from langchain_core.messages import AIMessage, HumanMessage
+
 from agent.disclaimer import DISCLAIMER
 
 TOOL_RESULT_PREVIEW_CHARS = 150
+
+
+def serialize_history(messages: list) -> list[dict]:
+    """
+    Converts a thread's checkpointed LangGraph messages into the plain
+    {role, content} shape the frontend already renders for each turn (see
+    App.jsx). Tool-call/tool-result messages and the SystemMessage aren't
+    included - the chat UI never displayed those directly, only the final
+    streamed answer per turn, so restored history looks the same as what
+    was on screen originally.
+    """
+    history = []
+    for m in messages:
+        if isinstance(m, HumanMessage) and m.content:
+            history.append({"role": "user", "content": m.content})
+        elif isinstance(m, AIMessage) and m.content and not getattr(m, "tool_calls", None):
+            history.append({"role": "assistant", "content": m.content})
+    return history
 
 
 def translate_event(event: dict) -> dict | None:

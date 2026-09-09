@@ -2,6 +2,33 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const WEBSOCKET_URL = "ws://localhost:8000/ws/chat";
+const THREAD_ID_KEY = "pharmacy_thread_id";
+
+// Conversation id, persisted in localStorage so a page refresh (or a
+// dropped connection reconnecting) resumes the same thread server-side
+// instead of starting a blank one. Falls back to null if localStorage is
+// unavailable (e.g. private browsing) - the chat still works, it just
+// won't survive a refresh in that case.
+function getStoredThreadId() {
+  try {
+    return localStorage.getItem(THREAD_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeThreadId(id) {
+  try {
+    localStorage.setItem(THREAD_ID_KEY, id);
+  } catch {
+    // ignore - see getStoredThreadId
+  }
+}
+
+function buildWebSocketUrl() {
+  const threadId = getStoredThreadId();
+  return threadId ? `${WEBSOCKET_URL}?thread_id=${encodeURIComponent(threadId)}` : WEBSOCKET_URL;
+}
 
 // Friendly labels for the tool names the backend reports mid-turn (see
 // app/agent/tools.py) - shown next to a pulsing cross while the agent works.
@@ -54,7 +81,7 @@ function App() {
   // Close it when the component unmounts (cleanup function) - this is the
   // standard React pattern for anything with a lifecycle outside React itself.
   useEffect(() => {
-    const ws = new WebSocket(WEBSOCKET_URL);
+    const ws = new WebSocket(buildWebSocketUrl());
     wsRef.current = ws;
 
     ws.onopen = () => setConnectionState("open");
@@ -63,6 +90,16 @@ function App() {
     // recieves msgs
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      // Sent once, right after connecting: the server's thread_id (so we
+      // can remember it even on a first-ever visit) plus any messages
+      // already saved for this thread - restores the conversation after a
+      // refresh or a reconnect instead of starting from an empty screen.
+      if (data.type === "history") {
+        if (data.thread_id) storeThreadId(data.thread_id);
+        setMessages(data.messages.map((m) => ({ role: m.role, content: m.content, status: null })));
+        return;
+      }
 
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
