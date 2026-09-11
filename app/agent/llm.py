@@ -1,6 +1,6 @@
 import os
 
-MODEL_NAME = "openrouter/free"  # after THREE specific free models failed today in
+MODEL_NAME = "inclusionai/ling-3.0-flash-sante:free"  # after THREE specific free models failed today in
                                   # different ways (nex-agi deprecated, both Gemma
                                   # variants persistently rate-limited, gpt-oss-120b
                                   # unavailable) - hand-picking a specific free model

@@ -4,7 +4,7 @@ FastAPI entry point. Run with:
     cd app
     uvicorn main:app --reload
 """
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager #for defining lifespan 
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket

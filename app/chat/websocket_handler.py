@@ -29,7 +29,7 @@ async def handle_connection(websocket: WebSocket) -> None:
             "thread_id": thread_id,
             "messages": serialize_history(past_messages),
         })
-
+#bug 2
         while True:
             try:
                 data = await websocket.receive_json()
@@ -39,7 +39,7 @@ async def handle_connection(websocket: WebSocket) -> None:
                 # and keep the connection alive instead of crashing.
                 logger.warning("Received malformed (non-JSON) message on thread %s; ignoring.", thread_id)
                 continue
-
+#bug 1
             user_text = data.get("content")
             if not isinstance(user_text, str):
                 # "content" missing, null, or some other non-string type -

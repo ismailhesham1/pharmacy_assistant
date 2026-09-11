@@ -2,7 +2,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.disclaimer import DISCLAIMER
 
-TOOL_RESULT_PREVIEW_CHARS = 150
+TOOL_RESULT_PREVIEW_CHARS = 150 # Maximum number of characters to display for tool results
 
 
 def serialize_history(messages: list) -> list[dict]:
@@ -28,7 +28,7 @@ def translate_event(event: dict) -> dict | None:
 #chat
     if event_type == "on_chat_model_stream":
         node = event.get("metadata", {}).get("langgraph_node")
-        if node != "agent": #filters out duplicates
+        if node != "agent": 
             return None
 
         chunk = event.get("data", {}).get("chunk")

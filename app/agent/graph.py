@@ -54,6 +54,13 @@ def agent_node(state: AgentState) -> dict:
     messages = [SystemMessage(content=system_prompt)] + cleaned_history
 
     response = llm.invoke(messages)
+
+    # TEMPORARY debug line - shows which actual underlying model answered,
+    # useful specifically when using openrouter/free, since the real model
+    # varies request to request. Remove before final submission.
+    actual_model = response.response_metadata.get("model_name") or response.response_metadata.get("model")
+    print(f"  [DEBUG] Actual model that answered: {actual_model}")
+
     return {"messages": [response]}
 
 
