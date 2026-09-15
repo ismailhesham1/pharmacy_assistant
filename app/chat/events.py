@@ -1,7 +1,5 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
-from agent.disclaimer import DISCLAIMER
-
 TOOL_RESULT_PREVIEW_CHARS = 150 # Maximum number of characters to display for tool results
 
 
@@ -66,11 +64,17 @@ def translate_event(event: dict) -> dict | None:
         if not messages:
             return None
 
+        # Send the disclaimer node's full final content and have the
+        # frontend REPLACE the message with it, rather than assuming it's
+        # always just the disclaimer suffix appended onto whatever was
+        # already streamed live. That assumption broke whenever
+        # disclaimer_node substitutes a fallback message (e.g. the model
+        # returned an empty/whitespace answer) - the fallback text isn't an
+        # appended suffix, so the old diff-based "just send the suffix"
+        # logic silently dropped it and the user saw what looked like an
+        # empty response. Sending the full content here is correct in both
+        # cases and self-heals any other streamed/final mismatch too.
         final_content = getattr(messages[0], "content", "") or ""
-        for disclaimer_text in DISCLAIMER.values():
-            suffix = f"\n\n{disclaimer_text}"
-            if final_content.endswith(suffix):
-                return {"type": "token", "content": suffix}
-        return None
+        return {"type": "replace", "content": final_content}
 
     return None

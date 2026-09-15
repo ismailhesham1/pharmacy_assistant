@@ -1,14 +1,7 @@
 import os
 
-MODEL_NAME = "inclusionai/ling-3.0-flash-sante:free"  # after THREE specific free models failed today in
-                                  # different ways (nex-agi deprecated, both Gemma
-                                  # variants persistently rate-limited, gpt-oss-120b
-                                  # unavailable) - hand-picking a specific free model
-                                  # is clearly not reliable today. The auto-router
-                                  # dynamically selects from whatever's CURRENTLY
-                                  # available and filters for tool-calling support,
-                                  # trading predictability of which exact model
-                                  # answers for actual uptime.
+MODEL_NAME = "inclusionai/ling-3.0-flash-sante:free"  
+                                 
 
 
 def get_llm():

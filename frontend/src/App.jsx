@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./App.css";
 
 const WEBSOCKET_URL = "ws://localhost:8000/ws/chat";
 const THREAD_ID_KEY = "pharmacy_thread_id";
+const RECONNECT_DELAY_MS = 2000;
 
 // Conversation id, persisted in localStorage so a page refresh (or a
 // dropped connection reconnecting) resumes the same thread server-side
@@ -69,6 +72,30 @@ function SendIcon({ className }) {
   );
 }
 
+// Compose/pencil glyph - the conventional "new chat" mark, kept visually
+// distinct from the brand cross so the two aren't mistaken for each other.
+function NewChatIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+// Renders the assistant's Markdown (bold text, numbered/bulleted lists,
+// tables - the model frequently produces all of these for product
+// comparisons) as real structured HTML instead of literal asterisks and
+// dashes. remark-gfm adds GitHub-flavored table support specifically,
+// since product comparison responses often come back as Markdown tables.
+function MessageContent({ text }) {
+  return (
+    <div className="message__markdown" dir="auto">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+    </div>
+  );
+}
+
 function App() {
   const [messages, setMessages] = useState([]); // {role: "user" | "assistant", content, status}
   const [input, setInput] = useState("");
@@ -77,15 +104,26 @@ function App() {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Open the WebSocket connection once, when the component first mounts.
-  // Close it when the component unmounts (cleanup function) - this is the
-  // standard React pattern for anything with a lifecycle outside React itself.
-  useEffect(() => {
+  // Wires up a fresh WebSocket connection (using whatever thread_id is
+  // currently in localStorage) and stores it in wsRef. Pulled into its own
+  // function so the initial mount, the auto-reconnect retry, and the "New
+  // Chat" button all go through the exact same connect/reconnect logic
+  // instead of multiple copies drifting apart.
+  function connect() {
     const ws = new WebSocket(buildWebSocketUrl());
     wsRef.current = ws;
 
     ws.onopen = () => setConnectionState("open");
-    ws.onclose = () => setConnectionState("closed");
+    ws.onclose = () => {
+      setConnectionState("closed");
+      // Automatically retry after a short delay if the connection drops
+      // unexpectedly (e.g. the backend restarts) - without this, the user
+      // is stuck seeing "Offline" until they manually refresh the page.
+      // startNewChat() below explicitly detaches this handler before
+      // closing the old socket, so an intentional new-chat close never
+      // triggers this retry.
+      setTimeout(connect, RECONNECT_DELAY_MS);
+    };
     ws.onerror = () => setConnectionState("closed");
     // recieves msgs
     ws.onmessage = (event) => {
@@ -116,6 +154,13 @@ function App() {
           // Append this token onto the in-progress assistant message -
           // this incremental append is what creates the "streaming" effect.
           nextLastMessage = { ...lastMessage, content: lastMessage.content + data.content };
+        } else if (data.type === "replace") {
+          // Sent once at the end of a turn with the true final message
+          // content - overwrites whatever was streamed in via "token"
+          // events rather than appending, so the displayed message is
+          // always correct even if it differs from what was streamed live
+          // (e.g. the backend substituted a fallback message).
+          nextLastMessage = { ...lastMessage, content: data.content };
         } else if (data.type === "tool_call") {
           nextLastMessage = { ...lastMessage, status: TOOL_LABELS[data.tool] || `Using ${data.tool}...` };
         } else if (data.type === "tool_result" || data.type === "done") {
@@ -128,6 +173,14 @@ function App() {
       });
     };
 
+    return ws;
+  }
+
+  // Open the WebSocket connection once, when the component first mounts.
+  // Close it when the component unmounts (cleanup function) - this is the
+  // standard React pattern for anything with a lifecycle outside React itself.
+  useEffect(() => {
+    const ws = connect();
     return () => ws.close();
   }, []); // empty dependency array = run once on mount, not on every re-render
 
@@ -135,6 +188,34 @@ function App() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
+
+  // Starts a brand-new conversation: swaps in a fresh thread_id, clears the
+  // messages shown locally, and reconnects the socket using that new id.
+  // The backend already treats an unseen thread_id as a blank conversation,
+  // so nothing stored server-side under the old thread_id is touched here -
+  // this only changes which thread the current session points to.
+  function startNewChat() {
+    const newThreadId = crypto.randomUUID();
+    storeThreadId(newThreadId);
+    setMessages([]);
+    setConnectionState("connecting");
+
+    // Detach the old socket's handlers before closing it - this both
+    // avoids a race where the old socket's async close event could stomp
+    // on the new connection's state, AND (importantly) prevents the
+    // auto-reconnect logic in onclose from firing for this intentional,
+    // expected close.
+    const oldWs = wsRef.current;
+    if (oldWs) {
+      oldWs.onopen = null;
+      oldWs.onclose = null;
+      oldWs.onerror = null;
+      oldWs.onmessage = null;
+      oldWs.close();
+    }
+
+    connect();
+  }
 
   function sendMessage(text) {
     const content = (text ?? input).trim();
@@ -182,9 +263,21 @@ function App() {
           </div>
         </div>
 
-        <div className={`status status--${connectionState}`}>
-          <CrossIcon className="status__dot" />
-          <span>{STATUS_LABEL[connectionState]}</span>
+        <div className="header__actions">
+          <button
+            type="button"
+            className="btn-newchat"
+            onClick={startNewChat}
+            aria-label="Start a new chat"
+          >
+            <NewChatIcon />
+            <span>New chat</span>
+          </button>
+
+          <div className={`status status--${connectionState}`} role="status" aria-live="polite">
+            <CrossIcon className="status__dot" />
+            <span>{STATUS_LABEL[connectionState]}</span>
+          </div>
         </div>
       </header>
 
@@ -221,9 +314,9 @@ function App() {
                     </span>
                   )}
                   {m.content && (
-                    <p className="message__text" dir="auto">
-                      {m.content}
-                    </p>
+                    m.role === "assistant"
+                      ? <MessageContent text={m.content} />
+                      : <p className="message__text" dir="auto">{m.content}</p>
                   )}
                 </div>
               </div>
@@ -247,6 +340,7 @@ function App() {
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           placeholder="Ask about a product, dosage, or policy..."
+          aria-label="Message"
           rows={1}
         />
         <button

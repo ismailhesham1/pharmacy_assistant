@@ -14,11 +14,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # add app/ to path
 
 from infrastructure.data_loaders.jsonl_loader import load_scraper_output
-from infrastructure.vector_store.chroma_store import ChromaStore
+from infrastructure.vector_store.postgres_store import PostgresStore
 from application.use_cases.build_index import build_index
 
 SCRAPER_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scraper", "data")
-CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "chroma")
+PG_CONFIG = dict(host="localhost", dbname="pharmacy", user="pharmacy_user", password="zim100100")
 
 
 def get_embedding_function():
@@ -47,14 +47,22 @@ def run():
     print("\nLoading embedding model (bge-m3 - first run downloads ~2.2GB)...")
     embedding_fn = get_embedding_function()
 
-    print(f"\nWriting to Chroma at {CHROMA_PERSIST_DIR} ...")
-    os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
-    store = ChromaStore(persist_dir=CHROMA_PERSIST_DIR, embedding_function=embedding_fn)
+    print(f"\nWriting to Postgres ...")
+    import psycopg2
+    from pgvector.psycopg2 import register_vector
+    conn = psycopg2.connect(**PG_CONFIG)
+    register_vector(conn)
+    store = PostgresStore(conn, embedding_function=embedding_fn)
 
     store.add_product_chunks(result.product_chunks)
     store.add_policy_chunks(result.policy_chunks)
 
-    print(f"\nDone. {store.products.count()} products indexed, {store.policies.count()} policy chunks indexed.")
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM products;")
+        product_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM policies;")
+        policy_count = cur.fetchone()[0]
+    print(f"\nDone. {product_count} products indexed, {policy_count} policy chunks indexed.")
 
 
 if __name__ == "__main__":
