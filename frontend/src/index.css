@@ -24,8 +24,11 @@
   --shadow: 0 12px 28px -12px rgba(15, 30, 22, 0.22);
   --shadow-sm: 0 2px 8px -2px rgba(15, 30, 22, 0.14);
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  /* IBM Plex: an engineering/systems typeface, not a decorative pick - it
+     reads as precise and clinical rather than as a generic chat-app skin,
+     matching a pharmacy catalog tool rather than a consumer assistant. */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 
   color-scheme: light dark;
   font: 16px/1.5 var(--font-sans);

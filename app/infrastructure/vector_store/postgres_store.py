@@ -59,7 +59,7 @@ class PostgresStore(VectorStorePort):
                          currency, in_stock, brand, category_path, product_url, image_url)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (id) DO NOTHING
-                    """,
+                    """, #resumability
                     (
                         f"{c.product_id}:{c.lang}", c.product_id, c.lang, c.embed_text, Vector(vector),
                         c.title, c.price, c.currency, c.in_stock, c.brand,

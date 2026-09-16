@@ -258,7 +258,7 @@ function App() {
             <CrossIcon />
           </span>
           <div>
-            <p className="brand__eyebrow">Pharmacy</p>
+            <p className="brand__eyebrow">Al-Dawaa Pharmacy</p>
             <h1 className="brand__title">Assistant</h1>
           </div>
         </div>
@@ -286,8 +286,8 @@ function App() {
           <div className="empty">
             <CrossIcon className="empty__icon" />
             <p className="empty__title">
-              Ask me about products, dosages, or store policies - I'll search the
-              catalog and policy docs to help.
+              Ask about Al-Dawaa products, dosages, or store policies - I'll
+              search the catalog and policy docs to help.
             </p>
             <div className="empty__suggestions">
               {SUGGESTIONS.map((s) => (
@@ -299,28 +299,39 @@ function App() {
           </div>
         ) : (
           <div className="messages">
-            {messages.map((m, i) => (
-              <div className={`message message--${m.role}`} key={i}>
-                {m.role === "assistant" && (
-                  <span className="message__avatar">
-                    <CrossIcon />
-                  </span>
-                )}
-                <div className="message__bubble">
-                  {m.status && (
-                    <span className="typing">
-                      <CrossIcon className="typing__dot" />
-                      {m.status}
+            {messages.map((m, i) => {
+              // Right after sending, the placeholder assistant message has no
+              // status yet (no tool_call event has arrived) and no content
+              // yet (no token has streamed in) - that gap can run long (this
+              // model's response time varies widely), and without an
+              // explicit "thinking" state the bubble just renders empty,
+              // which reads as broken rather than working. Scoped to the
+              // last message only, since it's the sole message that can
+              // still be in progress - anything earlier is already settled.
+              const isThinking = m.role === "assistant" && !m.status && !m.content && i === messages.length - 1;
+              return (
+                <div className={`message message--${m.role}`} key={i}>
+                  {m.role === "assistant" && (
+                    <span className="message__avatar">
+                      <CrossIcon />
                     </span>
                   )}
-                  {m.content && (
-                    m.role === "assistant"
-                      ? <MessageContent text={m.content} />
-                      : <p className="message__text" dir="auto">{m.content}</p>
-                  )}
+                  <div className="message__bubble">
+                    {(m.status || isThinking) && (
+                      <span className="typing">
+                        <CrossIcon className="typing__dot" />
+                        {m.status || "Thinking..."}
+                      </span>
+                    )}
+                    {m.content && (
+                      m.role === "assistant"
+                        ? <MessageContent text={m.content} />
+                        : <p className="message__text" dir="auto">{m.content}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div ref={bottomRef} />
           </div>
         )}
